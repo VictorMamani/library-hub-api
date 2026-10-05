@@ -1,93 +1,92 @@
-# library-hub-api
+# Library Hub API
 
+![Licencia: sin definir](https://img.shields.io/badge/licencia-sin%20definir-lightgrey)
+[![npm: 10.9.3](https://img.shields.io/badge/npm-10.9.3-CB3837?logo=npm)](https://docs.npmjs.com/cli/v10/)
+[![Build de GitLab CI/CD: sin pipeline](https://img.shields.io/badge/build-sin%20pipeline-lightgrey?logo=gitlab)](https://gitlab.com/jala-university1/cohort-3/ES.CO.CSWB-366.GA.T2.26.M2/SC/victor-mamani/capstone/library-hub-api/-/pipelines?ref=main)
 
+API modular con NestJS, TypeScript y PostgreSQL para autenticación, catálogo y préstamos de una biblioteca universitaria.
 
-## Getting started
+## Entorno completo
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+Requiere Docker con Compose y los repositorios `library-hub-api` y `library-hub-frontend` en carpetas hermanas. Node.js 22 desde 22.13, o Node.js 24 o superior, permite ejecutar los scripts localmente.
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://gitlab.com/jala-university1/cohort-3/ES.CO.CSWB-366.GA.T2.26.M2/SC/victor-mamani/capstone/library-hub-api.git
-git branch -M main
-git push -uf origin main
+```bash
+npm ci
+npm run setup:dev
+docker compose up -d --build
 ```
 
-## Integrate with your tools
+`setup:dev` crea el `.env` local desde el ejemplo y reemplaza el secreto de ejemplo por uno aleatorio. No sobrescribe un secreto ya configurado. El archivo queda fuera del control de versiones.
 
-* [Set up project integrations](https://gitlab.com/jala-university1/cohort-3/ES.CO.CSWB-366.GA.T2.26.M2/SC/victor-mamani/capstone/library-hub-api/-/settings/integrations)
+- Aplicación: `http://localhost:5180`
+- Salud de la API y PostgreSQL: `http://localhost:3001/api/health`
+- PostgreSQL local: puerto `54329`
 
-## Collaborate with your team
+Para ver el estado o detener los servicios conservando los datos:
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+```bash
+docker compose ps
+docker compose logs api
+docker compose stop
+```
 
-## Test and Deploy
+## Desarrollo local con PostgreSQL en Docker
 
-Use the built-in continuous integration in GitLab.
+```bash
+docker compose up -d database
+npm run dev
+```
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+Ejecutar el frontend por separado. Las migraciones SQL se aplican al iniciar la API, dentro de una transacción con bloqueo de migraciones y verificación de checksum. Las migraciones ya aplicadas no se modifican.
 
-***
+## Autenticación
 
-# Editing this README
+Registro y login entregan un access token JWT de 15 minutos y una cookie de renovación `HttpOnly`, `SameSite=Strict` y `Secure` en producción. La sesión del servidor dura como máximo siete días. La renovación rota el token y el logout revoca la sesión; los endpoints protegidos verifican también que la sesión siga activa.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+Las solicitudes POST a `/api/auth/*` requieren `Origin` igual a `APP_ORIGIN` y `X-Library-Client: web`. Los endpoints protegidos usan `Authorization: Bearer <access-token>`. Las contraseñas requieren entre 12 y 128 caracteres y se almacenan con scrypt y salt aleatorio.
 
-## Suggestions for a good README
+## Préstamos
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+La versión inicial asigna un ejemplar académico por libro. PostgreSQL impide préstamos activos simultáneos del mismo ejemplar. `LOAN_DAYS` configura el vencimiento, con 21 días como valor inicial. Cada usuario puede consultar y devolver sus propios préstamos; la devolución conserva el historial.
 
-## Name
-Choose a self-explaining name for your project.
+## Comprobaciones
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+```bash
+npm run build
+npm run lint
+npm run format:check
+npm test
+```
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+## Formato y calidad del código
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+Prettier mantiene el formato y ESLint revisa JavaScript/TypeScript. La configuración compartida usa dos espacios, comillas simples, punto y coma y un ancho de referencia de 100 caracteres.
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```bash
+npm run format
+npm run lint:fix
+npm run check
+```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+`format` aplica el formato; `format:check` lo comprueba sin editar. `check` ejecuta formato, lint, compilación y pruebas unitarias. Las pruebas de integración se ejecutan por separado porque requieren PostgreSQL. Las migraciones aplicadas quedan excluidas del formateador para conservar sus checksums.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+VS Code dispone de recomendaciones de extensiones y formato al guardar; instalar Prettier y ESLint desde esas recomendaciones. `.editorconfig` define indentación y finales de línea para otros editores compatibles.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+El `.gitignore` excluye dependencias, compilaciones, cobertura, archivos locales de entorno y temporales. `.env.example`, los lockfiles y las configuraciones compartidas del editor se incluyen en el control de versiones.
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+Las pruebas de integración requieren una base dedicada, `library_hub_test`, en el PostgreSQL de desarrollo:
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+```bash
+docker compose exec -T database psql -U library_hub -d postgres -c 'CREATE DATABASE library_hub_test;'
+npm run test:integration
+```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+Si la base ya existe, omitir su creación. Puede configurarse `TEST_DATABASE_URL`; las pruebas rechazan otra base y limpian exclusivamente las tablas de `library_hub_test`.
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+## Producción
 
-## License
-For open source projects, say how it is licensed.
+```bash
+docker build --target production -t library-hub-api .
+```
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Configurar `NODE_ENV=production`, `DATABASE_URL`, un `JWT_SECRET` aleatorio y `APP_ORIGIN` con HTTPS. Cuando el proveedor requiera TLS para PostgreSQL, usar `DATABASE_SSL=true` y los certificados de confianza necesarios. La aplicación falla al iniciar si la configuración esencial no es válida. Compose está destinado al desarrollo local.

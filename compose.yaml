@@ -1,0 +1,67 @@
+name: library-hub-dev
+
+services:
+  database:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: library_hub
+      POSTGRES_USER: library_hub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-library_hub_dev}
+    ports:
+      - '127.0.0.1:54329:5432'
+    volumes:
+      - library_hub_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U library_hub -d library_hub']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      target: development
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://library_hub:${POSTGRES_PASSWORD:-library_hub_dev}@database:5432/library_hub
+      JWT_SECRET: ${JWT_SECRET:?Ejecuta npm run setup:dev para preparar .env}
+      APP_ORIGIN: http://localhost:5180
+      LOAN_DAYS: ${LOAN_DAYS:-21}
+    ports:
+      - '127.0.0.1:3001:3001'
+    volumes:
+      - ./src:/app/src:ro
+      - ./migrations:/app/migrations:ro
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  frontend:
+    build:
+      context: ../library-hub-frontend
+      target: development
+    environment:
+      API_PROXY_TARGET: http://api:3001
+    ports:
+      - '127.0.0.1:5180:5180'
+    volumes:
+      - ../library-hub-frontend/src:/app/src:ro
+      - ../library-hub-frontend/index.html:/app/index.html:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  library_hub_data:
