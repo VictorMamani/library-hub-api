@@ -28,6 +28,6 @@ import { OriginGuard } from './origin.guard';
   ],
   controllers: [AuthController],
   providers: [AuthService, AccessGuard, OriginGuard],
-  exports: [AccessGuard, AuthService, JwtModule],
+  exports: [AccessGuard, OriginGuard, AuthService, JwtModule],
 })
 export class AuthModule {}

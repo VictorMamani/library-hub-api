@@ -1,6 +1,9 @@
 import 'reflect-metadata';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { ThrottlerStorage, ThrottlerStorageService } from '@nestjs/throttler';
 import request from 'supertest';
 import { DatabaseService } from '../src/database/database.service';
 import { CatalogService } from '../src/catalog/catalog.service';
@@ -46,7 +49,8 @@ describe('Autenticación y préstamos con PostgreSQL', () => {
   });
 
   beforeEach(async () => {
-    await db.query('TRUNCATE loans, sessions, books, users');
+    app.get<ThrottlerStorageService>(ThrottlerStorage).onApplicationShutdown();
+    await db.query('TRUNCATE profile_photos, loans, sessions, books, users');
   });
   afterAll(async () => {
     if (app) await app.close();
@@ -190,5 +194,100 @@ describe('Autenticación y préstamos con PostgreSQL', () => {
       .auth(user.body.accessToken, { type: 'bearer' })
       .send({ bookId: '../../unexpected' })
       .expect(400);
+  });
+
+  it('guarda, reemplaza y elimina la foto privada de la cuenta', async () => {
+    const owner = await register('photo-owner@example.com');
+    const other = await register('photo-other@example.com');
+    const photo = `data:image/jpeg;base64,${readFileSync(join(process.cwd(), 'test/fixtures/profile.jpg')).toString('base64')}`;
+    const first = await request(app.getHttpServer())
+      .get('/api/profile/photo')
+      .auth(owner.body.accessToken, { type: 'bearer' })
+      .expect(200);
+    expect(first.body).toEqual({ photo: null });
+    await request(app.getHttpServer())
+      .post('/api/profile/photo')
+      .set(headers)
+      .auth(owner.body.accessToken, { type: 'bearer' })
+      .send({ photo })
+      .expect(200);
+    await request(app.getHttpServer())
+      .post('/api/profile/photo')
+      .set(headers)
+      .auth(owner.body.accessToken, { type: 'bearer' })
+      .send({ photo })
+      .expect(200);
+    const persisted = await request(app.getHttpServer())
+      .get('/api/profile/photo')
+      .auth(owner.body.accessToken, { type: 'bearer' })
+      .expect(200);
+    expect(persisted.body.photo).toBe(photo);
+    expect(persisted.headers['cache-control']).toBe('no-store');
+    const privatePhoto = await request(app.getHttpServer())
+      .get('/api/profile/photo')
+      .auth(other.body.accessToken, { type: 'bearer' })
+      .expect(200);
+    expect(privatePhoto.body).toEqual({ photo: null });
+    const rows = await db.query('SELECT user_id FROM profile_photos');
+    expect(rows.rowCount).toBe(1);
+    await request(app.getHttpServer())
+      .post('/api/profile/photo/remove')
+      .set(headers)
+      .auth(owner.body.accessToken, { type: 'bearer' })
+      .expect(200);
+    const removed = await request(app.getHttpServer())
+      .get('/api/profile/photo')
+      .auth(owner.body.accessToken, { type: 'bearer' })
+      .expect(200);
+    expect(removed.body).toEqual({ photo: null });
+  });
+
+  it('rechaza fotos sin sesión, sin origen válido, con identidad ajena o datos inválidos', async () => {
+    await request(app.getHttpServer()).get('/api/profile/photo').expect(401);
+    await request(app.getHttpServer())
+      .post('/api/profile/photo')
+      .set(headers)
+      .send({ photo: 'bad' })
+      .expect(401);
+    const owner = await register('photo-validation@example.com');
+    const token = owner.body.accessToken;
+    await request(app.getHttpServer())
+      .post('/api/profile/photo')
+      .auth(token, { type: 'bearer' })
+      .send({ photo: 'bad' })
+      .expect(403);
+    for (const photo of [
+      'data:image/svg+xml;base64,PHN2Zz4=',
+      'data:image/jpeg;base64,aGVsbG8=',
+      `data:image/jpeg;base64,${Buffer.alloc(66000).toString('base64')}`,
+    ]) {
+      await request(app.getHttpServer())
+        .post('/api/profile/photo')
+        .set(headers)
+        .auth(token, { type: 'bearer' })
+        .send({ photo })
+        .expect(400);
+    }
+    await request(app.getHttpServer())
+      .post('/api/profile/photo')
+      .set(headers)
+      .auth(token, { type: 'bearer' })
+      .send({ photo: 'bad', userId: 'someone-else' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post('/api/profile/photo/remove')
+      .auth(token, { type: 'bearer' })
+      .expect(403);
+    expect((await db.query('SELECT user_id FROM profile_photos')).rowCount).toBe(0);
+  });
+
+  it('mantiene el límite de intentos de autenticación por ruta', async () => {
+    for (let attempt = 0; attempt < 11; attempt++) {
+      await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .set(headers)
+        .send({ email: 'bad-email', password: 'short' })
+        .expect(attempt < 10 ? 400 : 429);
+    }
   });
 });
