@@ -90,3 +90,24 @@ docker build --target production -t library-hub-api .
 ```
 
 Configurar `NODE_ENV=production`, `DATABASE_URL`, un `JWT_SECRET` aleatorio y `APP_ORIGIN` con HTTPS. Cuando el proveedor requiera TLS para PostgreSQL, usar `DATABASE_SSL=true` y los certificados de confianza necesarios. La aplicación falla al iniciar si la configuración esencial no es válida. Compose está destinado al desarrollo local.
+
+### Vercel
+
+Importar `VictorMamani/library-hub-api` desde GitHub, rama `main`, con el preset NestJS y Node.js 22. Mantener la configuración de compilación del preset, sin seleccionar `dist` como carpeta de publicación estática. `vercel.json` incluye las migraciones SQL en la función que ejecuta `src/main.ts`.
+
+Configurar estas variables para producción antes de desplegar:
+
+| Variable       | Valor                                                          |
+| -------------- | -------------------------------------------------------------- |
+| `NODE_ENV`     | `production`                                                   |
+| `DATABASE_URL` | Conexión al PostgreSQL alojado, obtenida del proveedor         |
+| `DATABASE_SSL` | `true` si el proveedor requiere TLS                            |
+| `JWT_SECRET`   | Secreto aleatorio de al menos 32 caracteres                    |
+| `APP_ORIGIN`   | Origen HTTPS del frontend en Netlify, sin rutas ni barra final |
+| `LOAN_DAYS`    | `21`, o el plazo elegido                                       |
+
+PostgreSQL debe estar disponible en la nube; el contenedor de desarrollo no se publica con la API. Puede conectarse un proveedor PostgreSQL desde el Marketplace de Vercel. Las migraciones se aplican al iniciar la aplicación y requieren permisos para crear las tablas.
+
+Comprobar `/api/health` después de desplegar; debe responder `{"status":"ok"}`. Usar el dominio estable de producción como `API_PROXY_TARGET` en Netlify. Ese dominio debe permitir las solicitudes del proxy sin exigir el inicio de sesión de Vercel.
+
+Mantener las credenciales de PostgreSQL y `JWT_SECRET` en las variables del backend. El frontend recibe únicamente la dirección pública de la API.
