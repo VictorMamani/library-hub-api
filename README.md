@@ -93,7 +93,7 @@ Configurar `NODE_ENV=production`, `DATABASE_URL`, un `JWT_SECRET` aleatorio y `A
 
 ### Vercel
 
-Importar `VictorMamani/library-hub-api` desde GitHub, rama `main`, con el preset NestJS y Node.js 22. Mantener la configuración de compilación del preset, sin seleccionar `dist` como carpeta de publicación estática. `vercel.json` incluye las migraciones SQL en la función que ejecuta `src/main.ts`.
+Importar `VictorMamani/library-hub-api` desde GitHub, rama `main`, con el preset NestJS y Node.js 22. Mantener la configuración de compilación del preset, sin seleccionar `dist` como carpeta de publicación estática. `vercel.json` selecciona el preset NestJS, que detecta `src/main.ts`. El análisis de archivos de Vercel detecta la lectura de la carpeta `migrations` y empaqueta sus archivos SQL con la aplicación.
 
 Configurar estas variables para producción antes de desplegar:
 
