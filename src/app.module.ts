@@ -9,6 +9,8 @@ import { CatalogModule } from './catalog/catalog.module';
 import { LoansModule } from './loans/loans.module';
 import { ProfileModule } from './profile/profile.module';
 import { HealthController } from './health.controller';
+import { ReadingModule } from './reading/reading.module';
+import { ReservationsModule } from './reservations/reservations.module';
 
 @Module({
   imports: [
@@ -19,6 +21,8 @@ import { HealthController } from './health.controller';
     CatalogModule,
     LoansModule,
     ProfileModule,
+    ReadingModule,
+    ReservationsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

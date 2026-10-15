@@ -7,6 +7,9 @@ export interface Book {
   subjects: string[];
   description: string;
   available: boolean;
+  availability?: 'available' | 'borrowed' | 'reserved';
+  loanDays?: number;
+  readingCount?: number;
 }
 
 export interface CatalogPage {
@@ -14,4 +17,6 @@ export interface CatalogPage {
   total: number;
   page: number;
   pageSize: number;
+  matchedTotal?: number;
+  authorSortLimit?: number;
 }

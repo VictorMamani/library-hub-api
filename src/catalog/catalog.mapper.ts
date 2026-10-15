@@ -24,5 +24,9 @@ export function mapDocument(doc: Document): Book | null {
     subjects: strings(doc.subject).slice(0, 8),
     description: '',
     available: true,
+    readingCount:
+      typeof doc.readinglog_count === 'number' && doc.readinglog_count >= 0
+        ? doc.readinglog_count
+        : 0,
   };
 }

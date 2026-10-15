@@ -5,6 +5,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
   Res,
   UseGuards,
@@ -14,11 +15,20 @@ import { AccessGuard } from '../auth/access.guard';
 import type { AuthenticatedRequest } from '../auth/auth.types';
 import { BorrowDto } from './loans.dto';
 import { LoansService } from './loans.service';
+import { PageQuery } from './page.dto';
 
 @Controller('loans')
 @UseGuards(AccessGuard)
 export class LoansController {
   constructor(private readonly loans: LoansService) {}
+  @Get('overview') overview(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: PageQuery,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    response.setHeader('Cache-Control', 'no-store');
+    return this.loans.overview(request.user.id, query.page);
+  }
   @Get()
   list(@Req() request: AuthenticatedRequest, @Res({ passthrough: true }) response: Response) {
     response.setHeader('Cache-Control', 'no-store');

@@ -13,8 +13,14 @@ export class CatalogQuery {
   category = '';
 
   @IsOptional()
-  @IsIn(['relevance', 'new', 'old'])
+  @IsIn(['relevance', 'new', 'old', 'popular', 'author'])
   sort = 'relevance';
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(200)
+  author = '';
 
   @IsOptional()
   @Type(() => Number)

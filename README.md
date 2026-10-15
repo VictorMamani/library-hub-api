@@ -4,7 +4,7 @@
 [![npm: 10.9.3](https://img.shields.io/badge/npm-10.9.3-CB3837?logo=npm)](https://docs.npmjs.com/cli/v10/)
 [![Build de GitLab CI/CD: sin pipeline](https://img.shields.io/badge/build-sin%20pipeline-lightgrey?logo=gitlab)](https://gitlab.com/jala-university1/cohort-3/ES.CO.CSWB-366.GA.T2.26.M2/SC/victor-mamani/capstone/library-hub-api/-/pipelines?ref=main)
 
-API modular con NestJS, TypeScript y PostgreSQL para autenticación, catálogo y préstamos de una biblioteca universitaria.
+API modular con NestJS, TypeScript y PostgreSQL para autenticación, catálogo, préstamos, reservas y lectura personal de una biblioteca universitaria.
 
 ## Entorno completo
 
@@ -48,6 +48,27 @@ Las solicitudes POST a `/api/auth/*` requieren `Origin` igual a `APP_ORIGIN` y `
 ## Préstamos
 
 La versión inicial asigna un ejemplar académico por libro. PostgreSQL impide préstamos activos simultáneos del mismo ejemplar. `LOAN_DAYS` configura el vencimiento, con 21 días como valor inicial. Cada usuario puede consultar y devolver sus propios préstamos; la devolución conserva el historial.
+
+## Reservas y lectura
+
+Las reservas siguen el orden de solicitud. La primera persona tiene prioridad al devolverse el ejemplar, hasta tomarlo prestado o cancelar; no hay caducidad automática. No se permite reservar el propio préstamo ni duplicar una reserva activa. Préstamo, devolución, reserva y cancelación bloquean la fila del ejemplar durante la transacción.
+
+Las rutas siguientes requieren Bearer JWT y operan sobre el usuario de la sesión:
+
+| Ruta                                     | Comportamiento                                                                      |
+| ---------------------------------------- | ----------------------------------------------------------------------------------- |
+| `GET /api/loans/overview?page=1`         | Activos por vencimiento e historial de diez registros por página.                   |
+| `GET /api/reservations?page=1`           | Reservas activas propias, posición y turno disponible; diez por página.             |
+| `GET /api/reservations/book/:bookId`     | Reserva y préstamo propios de una obra.                                             |
+| `POST /api/reservations`                 | Crear reserva con `{ "bookId": "OL3275955W" }`.                                     |
+| `POST /api/reservations/:id/cancel`      | Cancelar una reserva propia.                                                        |
+| `GET /api/reading/:bookId`               | Estado personal de lectura.                                                         |
+| `POST /api/reading/:bookId`              | Guardar `{ "status": "wishlist" }`, reading o completed; none quita el seguimiento. |
+| `GET /api/reading?status=reading&page=1` | Lista personal paginada; omitir status para todos los estados.                      |
+
+`003_reservations_reading.sql` añade ambos modelos sin modificar migraciones aplicadas. La lectura es independiente del préstamo. `GET /api/loans` conserva el contrato anterior de lista completa.
+
+El catálogo admite author como filtro combinado con q y category. sort=popular usa los registros de lectura de Open Library (readinglog) antes de paginar. sort=author solicita una selección de hasta 200 obras por relevancia, la ordena con comparación alfabética española por el primer autor mostrado y luego pagina en bloques de doce. Obras sin autor al final; desempates por título e identificador. total indica la selección navegable, matchedTotal las coincidencias externas y authorSortLimit el límite de 200. No representa un orden global de Open Library. Se sirven doce obras por página, hasta diez mil páginas; matchedTotal informa del total externo si supera ese límite.
 
 ## Comprobaciones
 
